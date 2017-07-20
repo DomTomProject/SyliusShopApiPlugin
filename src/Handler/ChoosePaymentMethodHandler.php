@@ -43,14 +43,17 @@ final class ChoosePaymentMethodHandler
         $this->stateMachineFactory = $stateMachineFactory;
     }
 
+
     /**
      * @param ChoosePaymentMethod $choosePaymentMethod
      */
-    public function handle(ChoosePaymentMethod $choosePaymentMethod)
-    {
+    public function handle(ChoosePaymentMethod $choosePaymentMethod) {
         /** @var OrderInterface $cart */
         $cart = $this->orderRepository->findOneBy(['tokenValue' => $choosePaymentMethod->orderToken()]);
-
+        $payments = [];
+        foreach ($cart->getPayments() as $payment) {
+            $payments[$payment->getId()] = $payment;
+        }
         Assert::notNull($cart, 'Cart has not been found.');
 
         $stateMachine = $this->stateMachineFactory->get($cart, OrderCheckoutTransitions::GRAPH);
@@ -61,9 +64,9 @@ final class ChoosePaymentMethodHandler
         $paymentMethod = $this->paymentMethodRepository->findOneBy(['code' => $choosePaymentMethod->paymentMethod()]);
 
         Assert::notNull($paymentMethod, 'Payment method has not been found');
-        Assert::true(isset($cart->getPayments()[$choosePaymentMethod->paymentIdentifier()]), 'Payment method has not been found.');
+        Assert::true(isset($payments[$choosePaymentMethod->paymentIdentifier()]), 'Payment method has not been found.');
 
-        $payment = $cart->getPayments()[$choosePaymentMethod->paymentIdentifier()];
+        $payment = $payments[$choosePaymentMethod->paymentIdentifier()];
 
         $payment->setMethod($paymentMethod);
         $stateMachine->apply(OrderCheckoutTransitions::TRANSITION_SELECT_PAYMENT);
